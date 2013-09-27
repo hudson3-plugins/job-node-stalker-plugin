@@ -3,6 +3,7 @@ package com.datalex.jenkins.plugins.nodestalker.wrapper;
 import hudson.model.*;
 import hudson.model.labels.LabelAssignmentAction;
 import hudson.model.queue.SubTask;
+import java.io.IOException;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.logging.Logger;
@@ -56,8 +57,13 @@ public class MyNodeAssignmentAction implements LabelAssignmentAction {
 
     private void setWorkspace(AbstractProject currentProject, NodeStalkerBuildWrapper buildWrapper, String jobName) {
         AbstractProject followedProject = AbstractProject.findNearest(jobName);
-        String workspaceValue = currentProject.getCustomWorkspace();
-        buildWrapper.setOldCustomWorkspace(workspaceValue);
+        String workspaceValue;
+        try {
+            workspaceValue = ((FreeStyleProject)currentProject).getCustomWorkspace();
+            buildWrapper.setOldCustomWorkspace(workspaceValue);
+        } catch (IOException ex) {
+            logger.info(ex.getLocalizedMessage());
+        }
         if(!followedProject.getName().equals(jobName)) {
             followedProject = null;
         }
@@ -80,7 +86,7 @@ public class MyNodeAssignmentAction implements LabelAssignmentAction {
             AbstractBuild build = followedProject.getSomeBuildWithWorkspace();
             if(build != null && build.getWorkspace() != null) {
                 String workspace = build.getWorkspace().getRemote();
-                project.setCustomWorkspace(workspace);
+                ((FreeStyleProject)project).setCustomWorkspace(workspace);
             }
         } catch (Exception e) {
             logger.severe("We could not set the parent workspace");
@@ -123,7 +129,7 @@ public class MyNodeAssignmentAction implements LabelAssignmentAction {
      * This method sets node if it is an empty string, if node is currently null, it sets node to master.
      *
      * @param project job that we want to follow
-     * @param defaultLabel label that Jenkins would assign without Node Stalker plugin
+     * @param defaultLabel label that Hudson would assign without Node Stalker plugin
      * @return  <ul>
      *            <li>Normally returns the node that the followed job most recently ran on</li>
      *            <li>returns DisplayName of defaultLabel if job can't be found, but defaultLabel exists</li>

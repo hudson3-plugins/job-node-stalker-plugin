@@ -2,11 +2,10 @@ package com.datalex.jenkins.plugins.nodestalker.wrapper;
 
 import hudson.model.TopLevelItem;
 import hudson.model.AbstractProject;
+import hudson.model.Hudson;
 import hudson.model.Job;
 
 import java.util.Collection;
-
-import jenkins.model.Jenkins;
 
 /**
  *
@@ -24,7 +23,7 @@ public final class Util {
             throw new IllegalArgumentException();
         }
 
-        TopLevelItem item = Jenkins.getInstance().getItem(jobName);
+        TopLevelItem item = Hudson.getInstance().getItem(jobName);
         if(item == null) {   //any node will be okay since the main job does not exist
             return null;
         }

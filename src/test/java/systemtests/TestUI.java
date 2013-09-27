@@ -3,20 +3,20 @@ package systemtests;
 import com.datalex.jenkins.plugins.nodestalker.wrapper.NodeStalkerBuildWrapper;
 import com.gargoylesoftware.htmlunit.html.HtmlCheckBoxInput;
 import com.gargoylesoftware.htmlunit.html.HtmlDivision;
+import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlImage;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import hudson.model.AbstractProject;
 import hudson.model.FreeStyleProject;
 import hudson.model.Label;
-import org.junit.Rule;
 import org.junit.Test;
-import org.jvnet.hudson.test.JenkinsRule;
 import org.xml.sax.SAXException;
 
 import java.io.IOException;
 import java.util.List;
 
 import static org.junit.Assert.*;
+import org.jvnet.hudson.test.HudsonTestCase;
 
 
 /**
@@ -26,10 +26,15 @@ import static org.junit.Assert.*;
  * Time: 14:19
  * To change this template use File | Settings | File Templates.
  */
-public class TestUI {
-
-    @Rule
-    public JenkinsRule j = new JenkinsRule();
+public class TestUI extends HudsonTestCase{
+    
+    @Override
+    protected void setUp() throws Exception {
+        //Fix: If we run with Smmothie plugin strategy, it causes  this Buildwrapper to occur
+        // twice (One from test classes and second from .hpl file) and the form submission fails.Issue only at test time 
+        System.setProperty("hudson.PluginStrategy", "hudson.ClassicPluginStrategy");
+        super.setUp();
+    }
 
     public void updateProjectConfig(HtmlPage page, String jobnameToFollow, boolean shareWorkspace) {
         page.getElementByName("_.job").setAttribute("value", jobnameToFollow);
@@ -48,13 +53,13 @@ public class TestUI {
     }
 
     public void assertPluginData(FreeStyleProject p, String jobNameToFollow, boolean expectedShareWorkspace) {
-       NodeStalkerBuildWrapper buildWrapper = p.getBuildWrappersList().get(NodeStalkerBuildWrapper.class);
+       NodeStalkerBuildWrapper buildWrapper = (NodeStalkerBuildWrapper) p.getBuildWrapper(NodeStalkerBuildWrapper.DESCRIPTOR);
        assertEquals(jobNameToFollow, buildWrapper.getJob());
        assertEquals(expectedShareWorkspace, buildWrapper.isShareWorkspace());
     }
 
     public void assertNodeWhereItHasRan(HtmlPage page, String expectedNode) {
-        List<HtmlDivision> nodes = page.getByXPath("//*[@id=\"main-panel\"]/div[1]/div[2]");
+        List<HtmlDivision> nodes = page.getByXPath("//*[@id=\"main-panel\"]/div[1]/div[4]");
         assertEquals(1, nodes.size());
         HtmlDivision div = nodes.get(0);
         String[] parts = div.getTextContent().split(" ");
@@ -65,20 +70,20 @@ public class TestUI {
 
     @Test
     public void testPluginJobConfigurationSaving() throws Exception {
-        FreeStyleProject p = j.createFreeStyleProject("JobA");
+        FreeStyleProject p = createFreeStyleProject("JobA");
         NodeStalkerBuildWrapper buildWrapper = new NodeStalkerBuildWrapper("", false);
-        p.getBuildWrappersList().add(buildWrapper);
-        JenkinsRule.WebClient webClient = j.createWebClient();
+        p.addBuildWrapper(buildWrapper);
+        WebClient webClient = createWebClient();
         HtmlPage page = webClient.getPage(p, "configure");
         assertPluginUI(page, "", false);
 
         //submitting config as it is
-        j.submit(page.getFormByName("config"));
+        submit(page.getFormByName("config"));
         assertPluginData(p, "", false);
 
         page = webClient.getPage(p, "configure");
         updateProjectConfig(page, "JobA", true);
-        j.submit(page.getFormByName("config"));
+        submit(page.getFormByName("config"));
 
         page = webClient.getPage(p, "configure");
         assertPluginUI(page, "JobA", true);
@@ -87,17 +92,17 @@ public class TestUI {
 
     @Test
     public void testFollowJobThatNeverRan() throws Exception {
-        j.createSlave("Node1", "label1", null);
-        FreeStyleProject vip = j.createFreeStyleProject("VIP");
+        createSlave("Node1", "label1", null);
+        FreeStyleProject vip = createFreeStyleProject("VIP");
         vip.setAssignedLabel(Label.get("label1"));
-        FreeStyleProject stalker = j.createFreeStyleProject("STALKER");
+        FreeStyleProject stalker = createFreeStyleProject("STALKER");
         NodeStalkerBuildWrapper buildWrapper = new NodeStalkerBuildWrapper("", false);
-        stalker.getBuildWrappersList().add(buildWrapper);
+        stalker.addBuildWrapper(buildWrapper);
 
-        JenkinsRule.WebClient webClient = j.createWebClient();
+        WebClient webClient = createWebClient();
         HtmlPage page = webClient.getPage(stalker, "configure");
         updateProjectConfig(page, "VIP", true);
-        j.submit(page.getFormByName("config"));
+        submit(page.getFormByName("config"));
         page = webClient.getPage(stalker);
 
         //click build button
@@ -115,18 +120,18 @@ public class TestUI {
 
     @Test
     public void testFollowJobThatRanOnNode1() throws Exception {
-        j.createSlave("Node1", "label1", null);
-        FreeStyleProject vip = j.createFreeStyleProject("VIP");
+        createSlave("Node1", "label1", null);
+        FreeStyleProject vip = createFreeStyleProject("VIP");
         vip.setAssignedLabel(Label.get("label1"));
         vip.scheduleBuild2(0);
-        FreeStyleProject stalker = j.createFreeStyleProject("STALKER");
+        FreeStyleProject stalker = createFreeStyleProject("STALKER");
         NodeStalkerBuildWrapper buildWrapper = new NodeStalkerBuildWrapper("", false);
-        stalker.getBuildWrappersList().add(buildWrapper);
+        stalker.addBuildWrapper(buildWrapper);
 
-        JenkinsRule.WebClient webClient = j.createWebClient();
+        WebClient webClient = createWebClient();
         HtmlPage page = webClient.getPage(stalker, "configure");
         updateProjectConfig(page, "VIP", true);
-        j.submit(page.getFormByName("config"));
+        submit(page.getFormByName("config"));
         page = webClient.getPage(stalker);
 
         //click build button
@@ -139,19 +144,19 @@ public class TestUI {
         assertEquals("Success", blueBall.getAttribute("alt"));
         assertNodeWhereItHasRan(page, "Node1");
         AbstractProject abstractStalker = AbstractProject.findNearest("STALKER");
-        assertEquals(null, abstractStalker.getCustomWorkspace());
+        assertEquals(null, ((FreeStyleProject)abstractStalker).getCustomWorkspace());
     }
 
     @Test
     public void testFollowUnexistantJob() throws Exception {
-        FreeStyleProject stalker = j.createFreeStyleProject("STALKER");
+        FreeStyleProject stalker = createFreeStyleProject("STALKER");
         NodeStalkerBuildWrapper buildWrapper = new NodeStalkerBuildWrapper("", false);
-        stalker.getBuildWrappersList().add(buildWrapper);
+        stalker.addBuildWrapper(buildWrapper);
 
-        JenkinsRule.WebClient webClient = j.createWebClient();
+        WebClient webClient = createWebClient();
         HtmlPage page = webClient.getPage(stalker, "configure");
         updateProjectConfig(page, "VIP", true);
-        j.submit(page.getFormByName("config"));
+        submit(page.getFormByName("config"));
         page = webClient.getPage(stalker);
 
         //click build button
@@ -170,20 +175,21 @@ public class TestUI {
 
     @Test
     public void testThatWorkspaceIsRestored() throws Exception {
-        j.createSlave("Node1", "label1", null);
-        FreeStyleProject vip = j.createFreeStyleProject("VIP");
+        createSlave("Node1", "label1", null);
+        FreeStyleProject vip = createFreeStyleProject("VIP");
         vip.setCustomWorkspace("/tmp/vipworkspace");
         vip.setAssignedLabel(Label.get("label1"));
         vip.scheduleBuild2(0);
-        FreeStyleProject stalker = j.createFreeStyleProject("STALKER");
+        FreeStyleProject stalker = createFreeStyleProject("STALKER");
         stalker.setCustomWorkspace("/tmp/stalker");
         NodeStalkerBuildWrapper buildWrapper = new NodeStalkerBuildWrapper("", false);
-        stalker.getBuildWrappersList().add(buildWrapper);
+        stalker.addBuildWrapper(buildWrapper);
 
-        JenkinsRule.WebClient webClient = j.createWebClient();
+        WebClient webClient = createWebClient();
         HtmlPage page = webClient.getPage(stalker, "configure");
         updateProjectConfig(page, "VIP", true);
-        j.submit(page.getFormByName("config"));
+        HtmlForm form = page.getFormByName("config");
+        form.submit();
         page = webClient.getPage(stalker);
 
         //click build button
@@ -197,7 +203,7 @@ public class TestUI {
         assertNodeWhereItHasRan(page, "Node1");
         AbstractProject abstractStalker = AbstractProject.findNearest("STALKER");
 
-        assertEquals("/tmp/stalker", abstractStalker.getCustomWorkspace());
+        assertEquals("/tmp/stalker", ((FreeStyleProject)abstractStalker).getCustomWorkspace());
     }
 
 }

@@ -1,12 +1,11 @@
 package com.datalex.jenkins.plugins.nodestalker.wrapper;
 
-import jenkins.model.Jenkins;
-
+import hudson.model.Hudson;
 import java.util.Collection;
 
 /**
  *
- * Grabs a list of all enabled jobs on the current Jenkins instance.
+ * Grabs a list of all enabled jobs on the current Hudson instance.
  *
  * @author Fabio Neves <fabio.neves@datalex.com>, Baris Batiege <baris.batiege@datalex.com>
  * @version 1.0
@@ -19,6 +18,6 @@ public final class JobListGrabber {
      *  @return
      */
     public static Collection<String> getJobs() {
-        return Jenkins.getInstance().getJobNames();
+        return Hudson.getInstance().getJobNames();
     }
 }

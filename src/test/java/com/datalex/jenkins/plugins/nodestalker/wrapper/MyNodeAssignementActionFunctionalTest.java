@@ -3,9 +3,7 @@ package com.datalex.jenkins.plugins.nodestalker.wrapper;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
 import hudson.model.Label;
-import org.junit.Rule;
 import org.junit.Test;
-import org.jvnet.hudson.test.JenkinsRule;
 import util.LogHandler;
 
 import java.io.IOException;
@@ -15,6 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
 import static org.junit.Assert.*;
+import org.jvnet.hudson.test.HudsonTestCase;
 import static org.mockito.Mockito.*;
 
 /**
@@ -22,15 +21,11 @@ import static org.mockito.Mockito.*;
  * Date: 29/04/13
  * Time: 14:47
  */
-public class MyNodeAssignementActionFunctionalTest {
-
-    @Rule
-    public JenkinsRule j = new JenkinsRule();
-
+public class MyNodeAssignementActionFunctionalTest extends HudsonTestCase{
 
     @Test
     public void testUpdateWorkspaceExistingFollowedProject() throws IOException, ExecutionException, InterruptedException {
-        FreeStyleProject followed = j.createFreeStyleProject("JobA");
+        FreeStyleProject followed = createFreeStyleProject("JobA");
         FreeStyleBuild build = followed.scheduleBuild2(0).get();
 
         FreeStyleProject mockedProject = mock(FreeStyleProject.class);
@@ -41,7 +36,7 @@ public class MyNodeAssignementActionFunctionalTest {
 
     @Test
     public void testPluginIsnotPresentDefaultLabelIsGiven() throws IOException {
-        FreeStyleProject followed = j.createFreeStyleProject("JobA");
+        FreeStyleProject followed = createFreeStyleProject("JobA");
         Label expected = Label.get("label1");
         followed.setAssignedLabel(expected);
         MyNodeAssignmentAction action = spy(new MyNodeAssignmentAction());
@@ -51,10 +46,10 @@ public class MyNodeAssignementActionFunctionalTest {
 
     @Test
     public void testPluginIsPresentButNoJobWasSpecified() throws Exception {
-        j.createSlave("Node1", "label1", null);
-        FreeStyleProject followed = j.createFreeStyleProject("JobA");
+        createSlave("Node1", "label1", null);
+        FreeStyleProject followed = createFreeStyleProject("JobA");
         NodeStalkerBuildWrapper plugin = new NodeStalkerBuildWrapper("", false);
-        followed.getBuildWrappersList().add(plugin);
+        followed.addBuildWrapper(plugin);
         Label expected = Label.get("label1");
         followed.setAssignedLabel(expected);
         MyNodeAssignmentAction action = spy(new MyNodeAssignmentAction());
@@ -64,14 +59,14 @@ public class MyNodeAssignementActionFunctionalTest {
 
     @Test
     public void testPluginIsPresentAndJobWasSpecified() throws Exception {
-        FreeStyleProject followed = j.createFreeStyleProject("JobA");
-        j.createSlave("Node1", "label1", null);
+        FreeStyleProject followed = createFreeStyleProject("JobA");
+        createSlave("Node1", "label1", null);
         Label expected = Label.get("label1");
         followed.setAssignedLabel(expected);
         followed.scheduleBuild2(0).get();
-        FreeStyleProject stalkerProject = j.createFreeStyleProject("JobB");
+        FreeStyleProject stalkerProject = createFreeStyleProject("JobB");
         NodeStalkerBuildWrapper plugin = new NodeStalkerBuildWrapper("JobA", false);
-        stalkerProject.getBuildWrappersList().add(plugin);
+        stalkerProject.addBuildWrapper(plugin);
 
         Label result = new MyNodeAssignmentAction().getAssignedLabel(stalkerProject);
         assertNotNull(result);
@@ -80,14 +75,14 @@ public class MyNodeAssignementActionFunctionalTest {
 
     @Test
     public void testPluginIsPresentAndJobWasSpecifiedSharingWorkspace() throws Exception {
-        FreeStyleProject followed = j.createFreeStyleProject("JobA");
-        j.createSlave("Node1", "label1", null);
+        FreeStyleProject followed = createFreeStyleProject("JobA");
+        createSlave("Node1", "label1", null);
         Label expected = Label.get("label1");
         followed.setAssignedLabel(expected);
         followed.scheduleBuild2(0).get();
-        FreeStyleProject stalkerProject = j.createFreeStyleProject("JobB");
+        FreeStyleProject stalkerProject = createFreeStyleProject("JobB");
         NodeStalkerBuildWrapper plugin = new NodeStalkerBuildWrapper("JobA", true);
-        stalkerProject.getBuildWrappersList().add(plugin);
+        stalkerProject.addBuildWrapper(plugin);
         MyNodeAssignmentAction action = spy(new MyNodeAssignmentAction());
         Label result = action.getAssignedLabel(stalkerProject);
         assertNotNull(result);
@@ -95,20 +90,18 @@ public class MyNodeAssignementActionFunctionalTest {
         verify(action, times(1)).updateWorkspace(followed, stalkerProject);
         assertEquals(followed.getSomeWorkspace().getRemote(), stalkerProject.getCustomWorkspace());
     }
-
-
-
+    
     @Test
     public void testPluginIsPresentAndFollowedJobDoesNotExist() throws Exception {
-        FreeStyleProject followed = j.createFreeStyleProject("JobA");
-        j.createSlave("Node1", "label1", null);
+        FreeStyleProject followed = createFreeStyleProject("JobA");
+        createSlave("Node1", "label1", null);
         Label expected = Label.get("label1");
         followed.setAssignedLabel(expected);
         followed.scheduleBuild2(0).get();
 
-        FreeStyleProject stalkerProject = j.createFreeStyleProject("JobB");
+        FreeStyleProject stalkerProject = createFreeStyleProject("JobB");
         NodeStalkerBuildWrapper plugin = new NodeStalkerBuildWrapper("JobASD", true);
-        stalkerProject.getBuildWrappersList().add(plugin);
+        stalkerProject.addBuildWrapper(plugin);
         MyNodeAssignmentAction action = new MyNodeAssignmentAction();
         MyNodeAssignmentAction.logger.setLevel(Level.ALL);
         MyNodeAssignmentAction.logger.setUseParentHandlers(false);
@@ -127,13 +120,13 @@ public class MyNodeAssignementActionFunctionalTest {
 
     @Test
     public void testPluginIsPresentAndFollowedJobDoesExistButHasNeverRun() throws Exception {
-        FreeStyleProject followed = j.createFreeStyleProject("JobA");
-        j.createSlave("Node1", "label1", null);
+        FreeStyleProject followed = createFreeStyleProject("JobA");
+        createSlave("Node1", "label1", null);
         Label expected = Label.get("label1");
         followed.setAssignedLabel(expected);
-        FreeStyleProject stalkerProject = j.createFreeStyleProject("JobB");
+        FreeStyleProject stalkerProject = createFreeStyleProject("JobB");
         NodeStalkerBuildWrapper plugin = new NodeStalkerBuildWrapper("JobA", true);
-        stalkerProject.getBuildWrappersList().add(plugin);
+        stalkerProject.addBuildWrapper(plugin);
         String expectedWorkspace = stalkerProject.getCustomWorkspace();
         MyNodeAssignmentAction action = spy(new MyNodeAssignmentAction());
         Label result = action.getAssignedLabel(stalkerProject);
@@ -141,7 +134,4 @@ public class MyNodeAssignementActionFunctionalTest {
         verify(action, times(1)).updateWorkspace(followed, stalkerProject);
         assertEquals(expectedWorkspace, stalkerProject.getCustomWorkspace());
     }
-
-
-
 }
